@@ -3410,6 +3410,8 @@ ParseNodePtr Parser::ParseTerm(BOOL fAllowCall,
             fAllowCall = FALSE;
             this->GetScanner()->Scan();
 
+            this->TrySkipTypeAnnotationIfEnabled();
+
             // If the token after the right paren is not => or if there was a newline between () and => this is a syntax error
             if (!IsDoingFastScan() && (m_token.tk != tkDArrow || this->GetScanner()->FHadNewLine()))
             {
@@ -3440,6 +3442,8 @@ ParseNodePtr Parser::ParseTerm(BOOL fAllowCall,
         {
             *plastRParen = this->GetScanner()->IchLimTok();
         }
+
+        this->TrySkipTypeAnnotationIfEnabled();
 
         ChkCurTok(tkRParen, ERRnoRparen);
 
@@ -5953,6 +5957,8 @@ void Parser::ParseFncDeclHelper(ParseNodeFnc * pnodeFnc, LPCOLESTR pNameHint, us
         {
             BOOL hadNewLine = this->GetScanner()->FHadNewLine();
 
+            this->TrySkipTypeAnnotationIfEnabled();
+
             // it can be the case we do not have a fat arrow here if there is a valid expression on the left hand side
             // of the fat arrow, but that expression does not parse as a parameter list.  E.g.
             //    a.x => { }
@@ -7024,6 +7030,8 @@ void Parser::ParseFncFormals(ParseNodeFnc * pnodeFnc, ParseNodeFnc * pnodeParent
 
                 this->GetScanner()->Scan();
 
+                this->TrySkipTypeAnnotationIfEnabled();
+
                 if (m_token.tk == tkAsg)
                 {
                     if (seenRestParameter && m_scriptContext->GetConfig()->IsES6RestEnabled())
@@ -7628,6 +7636,7 @@ void Parser::FinishFncDecl(ParseNodeFnc * pnodeFnc, LPCOLESTR pNameHint, bool fL
 
     JS_ETW_INTERNAL(EventWriteJSCRIPT_PARSE_FUNC(GetScriptContext(), pnodeFnc->functionId, /*Undefer*/FALSE));
 
+    this->TrySkipTypeAnnotationIfEnabled();
 
     // Do the work of creating an AST for a function body.
     // This is common to the un-deferred case and the case in which we un-defer late in the game.
@@ -9680,6 +9689,8 @@ ParseNodePtr Parser::ParseVariableDeclaration(
 
             this->GetScanner()->Scan();
 
+            this->TrySkipTypeAnnotationIfEnabled();
+
             if (m_token.tk == tkAsg)
             {
                 if (!allowInit)
@@ -9756,6 +9767,123 @@ ParseNodePtr Parser::ParseVariableDeclaration(
         }
         this->GetScanner()->Scan();
         ichMin = this->GetScanner()->IchMinTok();
+    }
+}
+
+// Skips a typescript type annotation if available.
+void Parser::TrySkipTypeAnnotationIfEnabled() {
+    // ToDo: Check feature flag
+
+    if (m_token.tk != tkColon) // Check for hint for type annotion
+        return;
+
+    this->GetScanner()->Scan();
+    this->SkipType();
+}
+
+// Skips a typscript type syntax.
+// Does not check exact ts syntax
+void Parser::SkipType()
+{
+    Parser::Scanner_t *scanner = this->GetScanner();
+    for (;;)
+    {
+        bool scanAgain = true;
+
+        // ToDo: Special protection on recursion here??
+        if (tkLParen == m_token.tk)
+        {
+            scanner->Scan();
+
+            if (tkRParen != m_token.tk)
+            {
+                // ToDo: Simple Parenthesese not supported!
+                this->SkipObjectType(); // ToDo: This allows for invalid ts syntax, but should be no problem...
+                ChkCurTokNoScan(tkRParen, ERRnoRparen);
+            }
+
+            scanner->Scan();
+
+            // Lambdas
+            if (tkDArrow == m_token.tk)
+            {
+                scanner->Scan();
+                this->SkipType();
+            }
+
+            scanAgain = false;
+        }
+        else if (tkLBrack == m_token.tk)
+        {
+            scanner->Scan();
+
+            if (tkRBrack != m_token.tk)
+            {
+                this->SkipType();
+                ChkCurTokNoScan(tkRBrack, ERRnoRbrack);
+            }
+        }
+        else if (tkLCurly == m_token.tk)
+        {
+            scanner->Scan();
+
+            if (tkRCurly != m_token.tk)
+            {
+                this->SkipObjectType();
+                ChkCurTokNoScan(tkRCurly, ERRnoRcurly);
+            }
+        }
+        else if (!m_token.IsTypeIdentifier())
+        {
+            // ToDo: Better error message
+            IdentifierExpectedError(m_token);
+        }
+
+        if (scanAgain)
+        {
+            scanner->Scan();
+        }
+
+        bool inUnionType = tkAnd == m_token.tk;
+        bool inIntersectionType = tkOr == m_token.tk;
+        bool startOfArrayDeclaration = tkLBrack == m_token.tk;
+
+        if (!inUnionType && !inIntersectionType && !startOfArrayDeclaration)
+            return;
+
+        if (!startOfArrayDeclaration)
+        {
+            scanner->Scan();
+        }
+    }
+}
+
+// Skips the content of a typescript object-type body
+void Parser::SkipObjectType()
+{
+    for (;;)
+    {
+        // Variable name
+        if (!m_token.IsTypeIdentifier())
+        {
+            // ToDo: Better error message
+            IdentifierExpectedError(m_token);
+        }
+
+        // ToDo: Skip "?"
+
+        // Type annotation
+        ChkNxtTok(tkColon, ERRnoColon);
+        this->SkipType();
+
+        // Check for next variable
+        auto nextVarOnNewLine = this->GetScanner()->FHadNewLine() && (tkID == m_token.tk);
+        // Warning: Comma needs to be detected for lambdas (See Parser::SkipType)
+        if (tkSColon != m_token.tk && tkComma != m_token.tk && !nextVarOnNewLine)
+            return;
+
+        if (!nextVarOnNewLine)
+            this->GetScanner()->Scan();
     }
 }
 

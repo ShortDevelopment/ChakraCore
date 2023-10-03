@@ -807,6 +807,10 @@ private:
         BOOL* nativeForOk = nullptr);
     BOOL TokIsForInOrForOf();
 
+    void TrySkipTypeAnnotationIfEnabled();
+    void SkipType();
+    void SkipObjectType();
+
     template<bool buildAST>
     void ParseStmtList(
         ParseNodePtr *ppnodeList,
@@ -1126,6 +1130,19 @@ private:
     {
         this->GetScanner()->Scan();
         ChkCurTok(tk, wErr);
+    }
+
+    // Compares the current token against the specified one and scans next token.
+    bool IsCurrentTokenEqual(tokens token)
+    {
+        bool result = m_token.tk == token;
+        this->GetScanner()->Scan();
+        return result;
+    }
+    bool IsNextTokenEqual(tokens token)
+    {
+        this->GetScanner()->Scan();
+        return IsCurrentTokenEqual(token);
     }
 
     template <class Fn>

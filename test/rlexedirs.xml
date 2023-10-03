@@ -372,4 +372,9 @@
     <tags>require_backend</tags>
   </default>
 </dir>
+<dir>
+  <default>
+    <files>TypeScript</files>
+  </default>
+</dir>
 </regress-exe>

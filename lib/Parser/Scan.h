@@ -53,6 +53,42 @@ public:
         return tk == tkID;
     }
 
+    BOOL IsTypeIdentifier() const
+    {
+        switch (tk)
+        {
+        case tkID:
+
+        case tkNULL:
+        case tkVOID:
+
+        case tkCHAR:
+        case tkBOOLEAN:
+
+        case tkSBYTE:
+        case tkBYTE:
+        case tkSHORT:
+        case tkUSHORT:
+        case tkINT:
+        case tkUINT:
+        case tkLONG:
+        case tkULONG:
+
+        case tkFLOAT:
+        case tkDOUBLE:
+        case tkDECIMAL:
+
+        case tkIntCon:
+        case tkFltCon:
+        case tkStrCon:
+        case tkBigIntCon:
+            return true;
+
+        default:
+            return false;
+        }
+    }
+
     IdentPtr GetStr() const
     {
         Assert(tk == tkStrCon || tk == tkStrTmplBasic || tk == tkStrTmplBegin || tk == tkStrTmplMid || tk == tkStrTmplEnd);
