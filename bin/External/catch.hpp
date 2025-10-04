@@ -8502,18 +8502,11 @@ namespace Catch {
     : m_info( other.m_info )
     {}
 
-#if defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable:4996) // std::uncaught_exception is deprecated in C++17
-#endif
     ScopedMessage::~ScopedMessage() {
-        if ( !std::uncaught_exception() ){
+        if ( std::uncaught_exceptions() == 0 ){
             getResultCapture().popScopedMessage(m_info);
         }
     }
-#if defined(_MSC_VER)
-#pragma warning(pop)
-#endif
 
 } // end namespace Catch
 
@@ -8826,22 +8819,15 @@ namespace Catch {
         m_timer.start();
     }
 
-#if defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable:4996) // std::uncaught_exception is deprecated in C++17
-#endif
     Section::~Section() {
         if( m_sectionIncluded ) {
             SectionEndInfo endInfo( m_info, m_assertions, m_timer.getElapsedSeconds() );
-            if( std::uncaught_exception() )
+            if( std::uncaught_exceptions() > 0 )
                 getResultCapture().sectionEndedEarly( endInfo );
             else
                 getResultCapture().sectionEnded( endInfo );
         }
     }
-#if defined(_MSC_VER)
-#pragma warning(pop)
-#endif
 
     // This indicates whether the section should be executed or not
     Section::operator bool() const {
