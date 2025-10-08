@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.10)
 project (CHAKRACORE)
 
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g")
@@ -378,6 +378,9 @@ if(CLR_CMAKE_PLATFORM_XPLAT)
     # do not set to `fvisibility=hidden` as it is going to
     # prevent the required interface is being exported
     # clang by default sets fvisibility=default
+
+    # Allow ch to export `OnChakraCoreLoadedEntry`
+    set(CMAKE_ENABLE_EXPORTS ON)
 
     # CXX WARNING FLAGS
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
