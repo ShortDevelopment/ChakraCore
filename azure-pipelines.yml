@@ -163,6 +163,14 @@ jobs:
           do_test: true
           test_tags: '--include-slow'
           build_outdir_suffix: ''
+        win25.x64.Test:
+          image_name: 'windows-2025'
+          build_type: 'test'
+          target: 'x64'
+          special_build: ''
+          do_test: true
+          test_tags: '--include-slow'
+          build_outdir_suffix: ''
         x64.Release:
           image_name: 'windows-2022'
           build_type: 'release'
