@@ -37,7 +37,7 @@
     <default>
       <files>GetCanonicalLocales.js</files>
       <compile-flags>-args summary -endargs</compile-flags>
-      <tags>Intl,exclude_icu62AndAboveTestFailures</tags>
+      <tags>Intl</tags>
     </default>
   </test>
   <test>
