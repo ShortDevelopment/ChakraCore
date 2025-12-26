@@ -102,6 +102,17 @@ namespace PlatformAgnostic
             u_getVersion(version);
             return version[0];
         }
+
+        inline int LinkedIcuMajorVersion()
+        {
+#if ICU_VERSION
+            return ICU_VERSION;
+#elif U_ICU_VERSION_MAJOR_NUM
+            return U_ICU_VERSION_MAJOR_NUM;
+#else
+            return GetICUMajorVersion();
+#endif
+        }
     }
 }
 #endif // ifdef HAS_ICU
