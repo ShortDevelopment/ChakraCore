@@ -2437,43 +2437,40 @@ DEFINE_ISXLOCALEAVAILABLE(PR, uloc)
             return JavascriptString::NewWithBuffer(formatted, formattedLen, scriptContext);
         }
 
-        if (PlatformAgnostic::ICUHelpers::LinkedIcuMajorVersion() >= 61)
+#if !defined(ICU_VERSION) || ICU_VERSION >= 61
+        UErrorCode status = U_ZERO_ERROR;
+        ScopedUFieldPositionIterator fpi(ufieldpositer_open(&status));
+
+        EnsureBuffer([&](UChar *buf, int bufLen, UErrorCode *status)
         {
-            UErrorCode status = U_ZERO_ERROR;
-            ScopedUFieldPositionIterator fpi(ufieldpositer_open(&status));
+            return unum_formatDoubleForFields(*fmt, num, buf, bufLen, fpi, status);
+        }, scriptContext->GetRecycler(), &formatted, &formattedLen);
 
-            EnsureBuffer([&](UChar *buf, int bufLen, UErrorCode *status)
-            {
-                return unum_formatDoubleForFields(*fmt, num, buf, bufLen, fpi, status);
-            }, scriptContext->GetRecycler(), &formatted, &formattedLen);
+        NumberFormatPartsBuilder nfpb(num, formatted, formattedLen, scriptContext);
 
-            NumberFormatPartsBuilder nfpb(num, formatted, formattedLen, scriptContext);
-
-            int partStart = 0;
-            int partEnd = 0;
-            int i = 0;
-            for (int kind = ufieldpositer_next(fpi, &partStart, &partEnd); kind >= 0; kind = ufieldpositer_next(fpi, &partStart, &partEnd), ++i)
-            {
-                nfpb.InsertPart(static_cast<UNumberFormatFields>(kind), partStart, partEnd);
-            }
-
-            return nfpb.ToPartsArray();
-        }
-        else
+        int partStart = 0;
+        int partEnd = 0;
+        int i = 0;
+        for (int kind = ufieldpositer_next(fpi, &partStart, &partEnd); kind >= 0; kind = ufieldpositer_next(fpi, &partStart, &partEnd), ++i)
         {
-            JavascriptLibrary *library = scriptContext->GetLibrary();
-            JavascriptArray *ret = library->CreateArray(1);
-            DynamicObject *part = library->CreateObject();
-            EnsureBuffer([&](UChar *buf, int bufLen, UErrorCode *status)
-            {
-                return unum_formatDouble(*fmt, num, buf, bufLen, nullptr, status);
-            }, scriptContext->GetRecycler(), &formatted, &formattedLen);
-            JavascriptOperators::InitProperty(part, PropertyIds::type, library->GetIntlUnknownPartString());
-            JavascriptOperators::InitProperty(part, PropertyIds::value, JavascriptString::NewWithBuffer(formatted, formattedLen, scriptContext));
-
-            ret->SetItem(0, part, PropertyOperationFlags::PropertyOperation_None);
-            return ret;
+            nfpb.InsertPart(static_cast<UNumberFormatFields>(kind), partStart, partEnd);
         }
+
+        return nfpb.ToPartsArray();
+#else
+        JavascriptLibrary *library = scriptContext->GetLibrary();
+        JavascriptArray *ret = library->CreateArray(1);
+        DynamicObject* part = library->CreateObject();
+        EnsureBuffer([&](UChar *buf, int bufLen, UErrorCode *status)
+        {
+            return unum_formatDouble(*fmt, num, buf, bufLen, nullptr, status);
+        }, scriptContext->GetRecycler(), &formatted, &formattedLen);
+        JavascriptOperators::InitProperty(part, PropertyIds::type, library->GetIntlUnknownPartString());
+        JavascriptOperators::InitProperty(part, PropertyIds::value, JavascriptString::NewWithBuffer(formatted, formattedLen, scriptContext));
+
+        ret->SetItem(0, part, PropertyOperationFlags::PropertyOperation_None);
+        return ret;
+#endif // #if ICU_VERSION >= 61 ... #else
 #else
         INTL_CHECK_ARGS(
             args.Info.Count == 3 &&
@@ -3015,24 +3012,21 @@ DEFINE_ISXLOCALEAVAILABLE(PR, uloc)
         // For ICU < 61, we can fake it by creating an array of ["other"], which
         // uplrules_getKeywords is guaranteed to return at minimum.
         // This array is only used in resolved options, so the majority of the functionality can remain (namely, select() still works)
-        if (PlatformAgnostic::ICUHelpers::LinkedIcuMajorVersion() >= 61)
-        {
-            DynamicObject *state = UnsafeVarTo<DynamicObject>(args[1]);
-            FinalizableUPluralRules *pr = GetOrCreateCachedUPluralRules(state, scriptContext);
+#if !defined(ICU_VERSION) || ICU_VERSION >= 61
+        DynamicObject *state = UnsafeVarTo<DynamicObject>(args[1]);
+        FinalizableUPluralRules *pr = GetOrCreateCachedUPluralRules(state, scriptContext);
 
-            UErrorCode status = U_ZERO_ERROR;
-            ScopedUEnumeration keywords(uplrules_getKeywords(*pr, &status));
-            ICU_ASSERT(status, true);
+        UErrorCode status = U_ZERO_ERROR;
+        ScopedUEnumeration keywords(uplrules_getKeywords(*pr, &status));
+        ICU_ASSERT(status, true);
 
-            ForEachUEnumeration16(keywords, [&](int index, const char16 *kw, charcount_t kwLength)
-            {
-                ret->SetItem(index, JavascriptString::NewCopyBuffer(kw, kwLength, scriptContext), PropertyOperation_None);
-            });
-        }
-        else
+        ForEachUEnumeration16(keywords, [&](int index, const char16 *kw, charcount_t kwLength)
         {
-            ret->SetItem(0, scriptContext->GetLibrary()->GetIntlPluralRulesOtherString(), PropertyOperation_None);
-        }
+            ret->SetItem(index, JavascriptString::NewCopyBuffer(kw, kwLength, scriptContext), PropertyOperation_None);
+        });
+#else
+        ret->SetItem(0, scriptContext->GetLibrary()->GetIntlPluralRulesOtherString(), PropertyOperation_None);
+#endif
 
         return ret;
 #else
