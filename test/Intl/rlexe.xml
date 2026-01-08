@@ -84,7 +84,7 @@
     <default>
       <compile-flags> -Intl -debugLaunch -dbgbaseline:IntlReturnedValueTests.js.dbg.baseline</compile-flags>
       <files>IntlReturnedValueTests.js</files>
-      <tags>Intl,require_winglob</tags> <!-- require_winglob because the baseline contains embedded bi-di markers -->
+      <tags>Intl</tags>
     </default>
   </test>
   <test>
