@@ -8,8 +8,6 @@ endif ()
 
 if (NO_ICU)
     set(TEST_ICU --not-tag exclude_noicu)
-elseif (NOT EMBED_ICU)
-    set(TEST_ICU --not-tag exclude_icu62AndAboveTestFailures)
 endif()
 
 if (BuildJIT)
