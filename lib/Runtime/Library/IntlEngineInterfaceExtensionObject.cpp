@@ -1,6 +1,6 @@
 //-------------------------------------------------------------------------------------------------------
 // Copyright (C) Microsoft. All rights reserved.
-// Copyright (c) 2022 ChakraCore Project Contributors. All rights reserved.
+// Copyright (c) ChakraCore Project Contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 #include "RuntimeLibraryPch.h"
@@ -695,7 +695,7 @@ PROJECTED_ENUMS(PROJECTED_ENUM)
             Assert(sourceContextInfo != nullptr);
 
             SRCINFO si;
-            memset(&si, 0, sizeof(si));
+            memset((void*)&si, 0, sizeof(si));
             si.sourceContextInfo = sourceContextInfo;
             SRCINFO *hsi = scriptContext->AddHostSrcInfo(&si);
             uint32 flags = fscrIsLibraryCode | (CONFIG_FLAG(CreateFunctionProxy) && !scriptContext->IsProfiling() ? fscrAllowFunctionProxy : 0);
@@ -2257,14 +2257,14 @@ DEFINE_ISXLOCALEAVAILABLE(PR, uloc)
         Field(ScriptContext *) sc;
         Field(UNumberFormatFields *) fields;
 
-        static const UNumberFormatFields UnsetField = static_cast<UNumberFormatFields>(0xFFFFFFFF);
+        static const uint8_t UnsetField = 0xFF;
 
         JavascriptString *GetPartTypeString(UNumberFormatFields field)
         {
             JavascriptLibrary *library = sc->GetLibrary();
 
             // this is outside the switch because MSVC doesn't like that UnsetField is not a valid enum value
-            if (field == UnsetField)
+            if ((static_cast<uint32_t>(field) & 0xFF) == UnsetField)
             {
                 return library->GetIntlLiteralPartString();
             }
@@ -2437,7 +2437,8 @@ DEFINE_ISXLOCALEAVAILABLE(PR, uloc)
             return JavascriptString::NewWithBuffer(formatted, formattedLen, scriptContext);
         }
 
-#if defined(ICU_VERSION) && ICU_VERSION >= 61
+        // windows-icu does not define `ICU_VERSION` but does support `unum_formatDoubleForFields` (ICU 61+) since Windows 10 1809 "Redstone 5" (`NTDDI_WIN10_RS5`).
+#if !defined(ICU_VERSION) || ICU_VERSION >= 61
         UErrorCode status = U_ZERO_ERROR;
         ScopedUFieldPositionIterator fpi(ufieldpositer_open(&status));
 
@@ -3012,7 +3013,9 @@ DEFINE_ISXLOCALEAVAILABLE(PR, uloc)
         // For ICU < 61, we can fake it by creating an array of ["other"], which
         // uplrules_getKeywords is guaranteed to return at minimum.
         // This array is only used in resolved options, so the majority of the functionality can remain (namely, select() still works)
-#if defined(ICU_VERSION) && ICU_VERSION >= 61
+        // 
+        // windows-icu does not define `ICU_VERSION` but does support `uplrules_getKeywords` (ICU 61+) since Windows 10 1809 "Redstone 5" (`NTDDI_WIN10_RS5`).
+#if !defined(ICU_VERSION) || ICU_VERSION >= 61
         DynamicObject *state = UnsafeVarTo<DynamicObject>(args[1]);
         FinalizableUPluralRules *pr = GetOrCreateCachedUPluralRules(state, scriptContext);
 

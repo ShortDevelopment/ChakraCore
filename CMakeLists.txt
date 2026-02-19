@@ -6,10 +6,15 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g")
 # Disable expected CMake workflow
 option(CHAKRACORE_BUILD_SH "Use build.sh")
 
+set(CCACHE_PROGRAM_NAME_DEFAULT "ccache")
+
 if(NOT CHAKRACORE_BUILD_SH)
     option(DISABLE_JIT "Disable JIT compilation" OFF)
     option(INTL_ICU "Enable Intl" ON)
     option(EMBED_ICU "Build ICU within ChakraCore build" OFF)
+    option(USE_CCACHE "Build using ccache" OFF)
+    set(CCACHE_PROGRAM_NAME ${CCACHE_PROGRAM_NAME_DEFAULT} CACHE
+        STRING "ccache executable")
     set(ICU_INCLUDE_PATH "" CACHE STRING "libicu iclude path")
     if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
       set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Build type" FORCE)
@@ -54,6 +59,8 @@ if(CC_USES_SYSTEM_ARCH_SH OR NOT CHAKRACORE_BUILD_SH)
         set(CC_TARGETS_ARM_SH 1)
     elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
         set(CC_TARGETS_ARM64_SH 1)
+    elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+        set(CC_TARGETS_ARM64_SH 1)
     endif()
     unset(CC_USES_SYSTEM_ARCH_SH CACHE)
 endif()
@@ -68,7 +75,7 @@ elseif(CC_TARGETS_ARM64_SH)
     add_definitions(-D_ARM64_=1)
     add_definitions(-D__arm64__=1)
     set(CC_TARGETS_ARM64 1)
-    set(CMAKE_SYSTEM_PROCESSOr "arm64")
+    set(CMAKE_SYSTEM_PROCESSOR "arm64")
 elseif(CC_TARGETS_X86_SH)
     set(CC_TARGETS_X86 1)
     set(CMAKE_SYSTEM_PROCESSOR "i386")
@@ -80,13 +87,21 @@ unset(CC_TARGETS_ARM_SH CACHE)
 unset(CC_TARGETS_X86_SH CACHE)
 unset(CC_TARGETS_AMD64_SH CACHE)
 
-if(CCACHE_PROGRAM_NAME_SH)
-  find_program(CCACHE_PROGRAM ${CCACHE_PROGRAM_NAME_SH})
-  if (CCACHE_PROGRAM)
-    set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
-    set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
-  endif()
-  unset(CCACHE_PROGRAM_NAME_SH CACHE)
+if (CHAKRACORE_BUILD_SH)
+    if(CCACHE_PROGRAM_NAME_SH)
+        set(USE_CCACHE ON)
+        set(CCACHE_PROGRAM_NAME ${CCACHE_PROGRAM_NAME_SH})
+        unset(CCACHE_PROGRAM_NAME_SH CACHE)
+    else()
+        set(USE_CCACHE OFF)
+        set(CCACHE_PROGRAM_NAME ${CCACHE_PROGRAM_NAME_DEFAULT})
+    endif()
+endif()
+
+if(USE_CCACHE)
+  find_program(CCACHE_PROGRAM ${CCACHE_PROGRAM_NAME} REQUIRED)
+  set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+  set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
 endif()
 
 if(ENABLE_VALGRIND_SH)
@@ -293,6 +308,14 @@ elseif(CC_TARGETS_ARM64)
     if(CC_TARGET_OS_OSX)
         add_compile_options(-arch arm64)
     endif()
+    if (CC_TARGET_OS_LINUX)
+      # arm64 .S mostly use ; comments, not accepted by GNU assembler.
+      # In lieu of converting them all, just strip these comments during build.
+      set(CMAKE_ASM_COMPILE_OBJECT
+          "sed -e 's/\;.*//g' <SOURCE> > <OBJECT_DIR>/$$(basename <SOURCE>)"
+          "<CMAKE_ASM_COMPILER> <DEFINES> <INCLUDES> -I $$(dirname <SOURCE>) <FLAGS> -o <OBJECT> -c <OBJECT_DIR>/$$(basename <SOURCE>)"
+      )
+    endif()
 else()
     message(FATAL_ERROR "Only AMD64, ARM, ARM64 and I386 are supported")
 endif()
@@ -372,7 +395,8 @@ if(CLR_CMAKE_PLATFORM_XPLAT)
         -D__STDC_WANT_LIB_EXT1__=1
         )
 
-    set(CMAKE_CXX_STANDARD 11)
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD_REQUIRED On)
 
     # todo: fix general visibility of the interface
     # do not set to `fvisibility=hidden` as it is going to
@@ -393,7 +417,6 @@ if(CLR_CMAKE_PLATFORM_XPLAT)
         -Wno-invalid-offsetof\
         -Wno-undefined-inline\
         -Wno-inconsistent-missing-override\
-        -Wno-c++14-extensions\
         -Wno-macro-redefined\
         -Wno-pragmas\
         -Wno-invalid-token-paste\

@@ -175,7 +175,6 @@ elif args.show_passes:
 # xplat: temp hard coded to exclude unsupported tests
 if sys.platform != 'win32':
     not_tags.add('exclude_xplat')
-    not_tags.add('require_winglob')
     not_tags.add('require_simd')
 else:
     not_tags.add('exclude_windows')
@@ -707,7 +706,7 @@ def main():
     # Set the right timezone, the tests need Pacific Standard Time
     # TODO: Windows. time.tzset only supports Unix
     if hasattr(time, 'tzset'):
-        os.environ['TZ'] = 'US/Pacific'
+        os.environ['TZ'] = 'America/Los_Angeles'
         time.tzset()
     elif sys.platform == 'win32':
         os.system('tzutil /s "Pacific Standard time"')

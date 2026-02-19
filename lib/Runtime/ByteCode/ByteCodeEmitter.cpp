@@ -6855,9 +6855,9 @@ void EmitIteratorTopLevelFinally(
     Js::RegSlot yieldOffsetLocation,
     ByteCodeGenerator* byteCodeGenerator,
     FuncInfo* funcInfo,
+    bool hasYield,
     bool isAsync)
 {
-    bool isCoroutine = funcInfo->byteCodeFunction->IsCoroutine();
 
     Js::ByteCodeLabel afterFinallyBlockLabel = byteCodeGenerator->Writer()->DefineLabel();
     byteCodeGenerator->Writer()->Empty(Js::OpCode::Leave);
@@ -6883,8 +6883,9 @@ void EmitIteratorTopLevelFinally(
     byteCodeGenerator->Writer()->MarkLabel(skipCallCloseLabel);
 
     byteCodeGenerator->PopJumpCleanup();
-    if (isCoroutine)
+    if (hasYield)
     {
+        Assert(funcInfo->byteCodeFunction->IsCoroutine());
         funcInfo->ReleaseTmpRegister(yieldOffsetLocation);
         funcInfo->ReleaseTmpRegister(yieldExceptionLocation);
     }
@@ -6904,6 +6905,7 @@ void EmitIteratorCatchAndFinally(
     Js::RegSlot yieldOffsetLocation,
     ByteCodeGenerator* byteCodeGenerator,
     FuncInfo* funcInfo,
+    bool hasYield,
     bool isAsync = false)
 {
     byteCodeGenerator->PopJumpCleanup();
@@ -6927,6 +6929,7 @@ void EmitIteratorCatchAndFinally(
         yieldOffsetLocation,
         byteCodeGenerator,
         funcInfo,
+        hasYield,
         isAsync);
 
     funcInfo->ReleaseTmpRegister(shouldCallReturnFunctionLocationFinally);
@@ -6979,10 +6982,11 @@ void EmitDestructuredArray(
 
     Js::RegSlot regException = Js::Constants::NoRegister;
     Js::RegSlot regOffset = Js::Constants::NoRegister;
-    bool isCoroutine = funcInfo->byteCodeFunction->IsCoroutine();
+    bool hasYield = byteCodeGenerator->GetHasYield(lhs);
 
-    if (isCoroutine)
+    if (hasYield)
     {
+        Assert(funcInfo->byteCodeFunction->IsCoroutine());
         regException = funcInfo->AcquireTmpRegister();
         regOffset = funcInfo->AcquireTmpRegister();
     }
@@ -6992,7 +6996,7 @@ void EmitDestructuredArray(
     Js::ByteCodeLabel catchLabel = byteCodeGenerator->Writer()->DefineLabel();
     byteCodeGenerator->Writer()->RecordCrossFrameEntryExitRecord(true);
 
-    if (isCoroutine)
+    if (hasYield)
     {
         byteCodeGenerator->Writer()->BrReg2(Js::OpCode::TryFinallyWithYield, finallyLabel, regException, regOffset);
         byteCodeGenerator->PushJumpCleanupForTry(
@@ -7028,7 +7032,8 @@ void EmitDestructuredArray(
         regException,
         regOffset,
         byteCodeGenerator,
-        funcInfo);
+        funcInfo,
+        hasYield);
 
     funcInfo->ReleaseTmpRegister(nextMethodReg);
     funcInfo->ReleaseTmpRegister(iteratorLocation);
@@ -9930,6 +9935,7 @@ void EmitForInOrForOf(ParseNodeForInOrForOf *loopNode, ByteCodeGenerator *byteCo
 {
     bool isForIn = (loopNode->nop == knopForIn);
     bool isForAwaitOf = (loopNode->nop == knopForAwaitOf);
+    bool hasYield = isForAwaitOf || byteCodeGenerator->GetHasYield(loopNode);
     Assert(isForAwaitOf || isForIn || loopNode->nop == knopForOf);
 
     BeginEmitBlock(loopNode->pnodeBlock, byteCodeGenerator, funcInfo);
@@ -9993,10 +9999,9 @@ void EmitForInOrForOf(ParseNodeForInOrForOf *loopNode, ByteCodeGenerator *byteCo
     Js::RegSlot shouldCallReturnFunctionLocation = loopNode->shouldCallReturnFunctionLocation;
     Js::RegSlot shouldCallReturnFunctionLocationFinally = loopNode->shouldCallReturnFunctionLocationFinally;
 
-    bool isCoroutine = funcInfo->byteCodeFunction->IsCoroutine();
-
-    if (isCoroutine)
+    if (hasYield)
     {
+        Assert(funcInfo->byteCodeFunction->IsCoroutine());
         regException = funcInfo->AcquireTmpRegister();
         regOffset = funcInfo->AcquireTmpRegister();
     }
@@ -10040,7 +10045,7 @@ void EmitForInOrForOf(ParseNodeForInOrForOf *loopNode, ByteCodeGenerator *byteCo
     byteCodeGenerator->Writer()->Reg1(Js::OpCode::LdFalse, shouldCallReturnFunctionLocation);
     byteCodeGenerator->Writer()->Reg1(Js::OpCode::LdFalse, shouldCallReturnFunctionLocationFinally);
 
-    if (isCoroutine)
+    if (hasYield)
     {
         byteCodeGenerator->Writer()->BrReg2(Js::OpCode::TryFinallyWithYield, finallyLabel, regException, regOffset);
         byteCodeGenerator->PushJumpCleanupForTry(
@@ -10121,6 +10126,7 @@ void EmitForInOrForOf(ParseNodeForInOrForOf *loopNode, ByteCodeGenerator *byteCo
         regOffset,
         byteCodeGenerator,
         funcInfo,
+        hasYield,
         isForAwaitOf);
 }
 
@@ -12671,11 +12677,11 @@ void Emit(ParseNode* pnode, ByteCodeGenerator* byteCodeGenerator, FuncInfo* func
 
         finallyLabel = byteCodeGenerator->Writer()->DefineLabel();
         byteCodeGenerator->Writer()->RecordCrossFrameEntryExitRecord(true);
+        bool hasYield = byteCodeGenerator->GetHasYield(pnodeTryFinally);
 
-        // [CONSIDER][aneeshd] Ideally the TryFinallyWithYield opcode needs to be used only if there is a yield expression.
-        // For now, if the function is generator we are using the TryFinallyWithYield.
-        if (funcInfo->byteCodeFunction->IsCoroutine())
+        if (hasYield)
         {
+            Assert(funcInfo->byteCodeFunction->IsCoroutine());
             regException = funcInfo->AcquireTmpRegister();
             regOffset = funcInfo->AcquireTmpRegister();
             byteCodeGenerator->Writer()->BrReg2(Js::OpCode::TryFinallyWithYield, finallyLabel, regException, regOffset);
@@ -12719,7 +12725,7 @@ void Emit(ParseNode* pnode, ByteCodeGenerator* byteCodeGenerator, FuncInfo* func
         Emit(pnodeFinally->pnodeBody, byteCodeGenerator, funcInfo, fReturnValue);
         funcInfo->ReleaseLoc(pnodeFinally->pnodeBody);
 
-        if (funcInfo->byteCodeFunction->IsCoroutine())
+        if (hasYield)
         {
             funcInfo->ReleaseTmpRegister(regOffset);
             funcInfo->ReleaseTmpRegister(regException);

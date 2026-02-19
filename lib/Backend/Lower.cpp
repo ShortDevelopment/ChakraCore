@@ -2605,6 +2605,9 @@ Lowerer::LowerRange(IR::Instr *instrStart, IR::Instr *instrEnd, bool defaultDoFa
             instrPrev = this->LowerTry(instr, true /*try-catch*/);
             break;
 
+        case Js::OpCode::TryFinallyWithYield:
+            // TODO Implement TryFinallyWithYield  before enabling Jit on full async functions
+            AssertOrFailFastMsg(false, "TryFinallyWithYield not implemented in Jit, should not be trying to Jit this function.");
         case Js::OpCode::TryFinally:
             instrPrev = this->LowerTry(instr, false /*try-finally*/);
             break;
@@ -6935,7 +6938,7 @@ Lowerer::LowerScopedLdInst(IR::Instr *instr, IR::JnHelperMethod helperMethod)
     src = instr->UnlinkSrc2();
     AssertMsg(src->IsRegOpnd(), "Expected Reg opnd as src2");
 
-    // __out Var*. The StackSym is allocated in irbuilder, and here we need to insert a lea
+    // _Out_ Var*. The StackSym is allocated in irbuilder, and here we need to insert a lea
     StackSym* dstSym = src->GetStackSym();
     IR::Instr *load = InsertLoadStackAddress(dstSym, instr);
     IR::Opnd* tempOpnd = load->GetDst();

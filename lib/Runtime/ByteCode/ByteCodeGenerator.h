@@ -1,5 +1,6 @@
 //-------------------------------------------------------------------------------------------------------
 // Copyright (C) Microsoft. All rights reserved.
+// Copyright (c) ChakraCore Project Contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 #if defined(_M_ARM32_OR_ARM64) || defined(_M_X64)
@@ -61,6 +62,8 @@ private:
     Js::ParseableFunctionInfo * pRootFunc;
 
     SList<FuncInfo*> * funcInfosToFinalize;
+    SList<ParseNode*> * nodesToTrackForYield;
+    SList<ParseNode*> * nodesWithYield;
 
     using JumpCleanupList = DList<JumpCleanupInfo, ArenaAllocator>;
     JumpCleanupList* jumpCleanupList;
@@ -405,11 +408,11 @@ public:
 
     bool DoJitLoopBodies(FuncInfo *funcInfo) const;
 
-    static void Generate(__in ParseNodeProg *pnode, uint32 grfscr, __in ByteCodeGenerator* byteCodeGenerator, __inout Js::ParseableFunctionInfo ** ppRootFunc, __in uint sourceIndex, __in bool forceNoNative, __in Parser* parser, Js::ScriptFunction ** functionRef);
+    static void Generate(_In_ ParseNodeProg *pnode, uint32 grfscr, _In_ ByteCodeGenerator* byteCodeGenerator, __inout Js::ParseableFunctionInfo ** ppRootFunc, _In_ uint sourceIndex, _In_ bool forceNoNative, _In_ Parser* parser, Js::ScriptFunction ** functionRef);
     void Begin(
-        __in ArenaAllocator *alloc,
-        __in uint32 grfscr,
-        __in Js::ParseableFunctionInfo* pRootFunc);
+        _In_ ArenaAllocator *alloc,
+        _In_ uint32 grfscr,
+        _In_ Js::ParseableFunctionInfo* pRootFunc);
 
     void SetCurrentSourceIndex(uint sourceIndex) { this->sourceIndex = sourceIndex; }
     uint GetCurrentSourceIndex() { return sourceIndex; }
@@ -483,6 +486,11 @@ public:
     void PopJumpCleanup() { this->jumpCleanupList->RemoveHead(); }
     bool HasJumpCleanup() { return !this->jumpCleanupList->Empty(); }
     void EmitJumpCleanup(ParseNode* target, FuncInfo* funcInfo);
+
+    void ByteCodeGenerator::SetHasYield();
+    bool ByteCodeGenerator::GetHasYield(ParseNode* node);
+    void ByteCodeGenerator::PopTrackForYield(ParseNode* node);
+    void ByteCodeGenerator::PushTrackForYield(ParseNode* node);
 
 private:
     bool NeedCheckBlockVar(Symbol* sym, Scope* scope, FuncInfo* funcInfo) const;
